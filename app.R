@@ -18,13 +18,13 @@ p_load(tidyverse, googlesheets4, shiny, lubridate, bslib, ggbeeswarm)
 # gs4_deauth()
 
 # Authenticate using token. If no browser opens, the authentication works.
-gs4_auth(cache = ".secrets", email = "colewilliambaril95@gmail.com")
+gs4_auth(cache = ".secrets", email = "email")
 
 # Setup ----
 
 options(scipen=10000)
 
-df <- read_sheet("https://docs.google.com/spreadsheets/d/1mxJ46ZMN1EMKeJje2Ol0_XCcp6lf4PmEK5S8KZjR_mU/edit?gid=0#gid=0") |> 
+df <- read_sheet("link to google sheet") |> 
   drop_na(`Job Title`) |> 
   mutate(normalized_salary_low = case_when(`Pay Unit` == "Hourly" ~ `Pay Lower`*1890,
                                            `Pay Unit` == "Biweekly" ~ `Pay Lower`*27,
