@@ -55,7 +55,7 @@ The app is built using the following R packages:
 - `ggbeeswarm` for creating beeswarm plots
 - `bsicons` for adding custom icons in the UI
 
-How It Works
+## How It Works
 
 The app retrieves the Google Sheets data and processes it by normalizing salary ranges based on hourly, biweekly, and annual pay units.
 Various metrics are calculated, such as total applications, cover letters, exams, and interviews.
