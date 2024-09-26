@@ -1,6 +1,6 @@
 # Job Application Tracker
 
-This Shiny app allows you to track your progress as you apply for jobs. It pulls data directly from Google Sheets using the `googlesheets4` package, processes the data, and presents key metrics and visualizations of your job application journey. 
+This Shiny app allows me to track my progress as I apply for jobs. It pulls data directly from Google Sheets using the `googlesheets4` package, processes the data, and presents key metrics and visualizations of ny job application journey. 
 
 The app is available [here](https://colewb.shinyapps.io/Job_Applications/). 
 
