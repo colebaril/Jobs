@@ -1,5 +1,5 @@
 require(pacman)
-p_load(tidyverse, googlesheets4, shiny, lubridate, bslib, ggbeeswarm)
+p_load(tidyverse, googlesheets4, shiny, lubridate, bslib, ggbeeswarm, shinycssloaders)
 
 # OAuth ----
 
@@ -18,13 +18,13 @@ p_load(tidyverse, googlesheets4, shiny, lubridate, bslib, ggbeeswarm)
 # gs4_deauth()
 
 # Authenticate using token. If no browser opens, the authentication works.
-gs4_auth(cache = ".secrets", email = "email")
+gs4_auth(cache = ".secrets", email = "colewilliambaril95@gmail.com")
 
 # Setup ----
 
 options(scipen=10000)
 
-df <- read_sheet("link to google sheet") |> 
+df <- read_sheet("https://docs.google.com/spreadsheets/d/1mxJ46ZMN1EMKeJje2Ol0_XCcp6lf4PmEK5S8KZjR_mU/edit?gid=0#gid=0") |> 
   drop_na(`Job Title`) |> 
   mutate(normalized_salary_low = case_when(`Pay Unit` == "Hourly" ~ `Pay Lower`*1890,
                                            `Pay Unit` == "Biweekly" ~ `Pay Lower`*27,
@@ -72,7 +72,7 @@ options(shiny.sanitize.errors = TRUE,
 # UI ----------------------------------------------------------------------
 
 ui <- page_sidebar(
-  title = "Job Applications Dashboard",
+  title = "Cole's Job Applications Dashboard",
 
   sidebar = sidebar(
     sliderInput(
@@ -82,7 +82,20 @@ ui <- page_sidebar(
       max = max(max_date), # Max date (assumed from penguins dataset)
       value = c(min(min_date), max(max_date)), # Default to min and max
       timeFormat = "%Y-%m-%d"               # Format the dates displayed
-    )
+    ),
+    p(strong("Personal Links:"),
+      br(),
+      tags$a(href="https://github.com/colebaril/Jobs", "GitHub Repository"),
+      br(),
+      tags$a(href="https://github.com/colebaril", "GitHub Page"),
+      br(),
+      tags$a(href="https://colebaril.ca/", "Personal Website"),
+      br(),
+      tags$a(href="https://colebaril.ca/files/Cole%20Baril%20CV%20Sept%202024.pdf", "My Resume"),
+    ),
+    p(strong("Looking for a star employee?"),
+    tags$strong(tags$a(href="mailto:colebarilca@gmail.com", "Email me!"))
+    ),  # Replace with your email address
   ),
   layout_columns(
     fill = FALSE,
@@ -143,20 +156,23 @@ server <- function(input, output) {
     df |> 
       filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) |> 
     ggplot() +
-      geom_bar(aes(x = `Type`, fill = `Result`), alpha = 0.5) +
+      geom_bar(aes(x = `Type`, fill = `Result`, colour = `Result`), alpha = 0.5) +
       theme_bw(base_size = 16) +
       scale_fill_viridis_d(end = 0.9) +
+      scale_colour_viridis_d(end = 0.9) +
+      scale_y_continuous(breaks = scales::pretty_breaks(), labels = scales::label_number(accuracy = 1)) +
       theme(axis.text.x = element_text(size = 10)) + 
       labs(x = "Job Sector",
            y = "Number of Applications")
   })
     
     output$compensation <- renderPlot({
+
       df |> 
-        filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) |> 
-      ggplot(aes(x = Type, y = average_salary, fill = Type, colour = Type)) +
+        # filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) |> 
+      ggplot(aes(x = Type, y = average_salary, fill = `Type`, colour = `Type`)) +
         geom_violin(trim = FALSE, drop = FALSE, alpha = 0.6) +
-        geom_beeswarm(width = 0.2, height = 0, size = 5, alpha = 0.8, pch=21) +
+        geom_beeswarm(size = 5, alpha = 0.8, pch=21) +
         annotate("text", x = Inf, y = Inf, label = paste("NA count:", num_na), 
                  hjust = 1.1, vjust = 2, size = 5, color = "red", fontface = "bold") +
         theme_bw(base_size = 16) +
@@ -167,16 +183,21 @@ server <- function(input, output) {
         
         labs(x = "Job Sector",
              y = "Mean Compensation (CAD)")
+      
+     
     
   })
     
     output$date_applied <- renderPlot({
       # Create a new column for week-year
       application_counts <- application_counts %>%
-        filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) |> 
+        # filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) |>
         mutate(week_year = paste0(format(`Date Applied`, "%Y"), "-W", 
                                   format(`Date Applied`, "%U"), " (", 
-                                  format(`Date Applied`, "%b"), ")"))
+                                  format(`Date Applied`, "%b"), ")")) |> 
+        summarise(number_of_jobs = sum(number_of_jobs),
+                  .by = week_year)
+  
       
       application_counts |> 
         ggplot(aes(x = week_year, y = number_of_jobs, size = number_of_jobs)) + 
@@ -186,8 +207,8 @@ server <- function(input, output) {
         labs(x = "Date Applied (Year-Week)", y = "Number of Applications") +
         theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10)) +  
         expand_limits(y = max(application_counts$number_of_jobs) + 0.5) +
-        scale_y_continuous(breaks = seq(0, max(application_counts$number_of_jobs, na.rm = TRUE), by = 1)) +  
-        scale_size_continuous("Number of \nApplications", breaks = seq(1, max(application_counts$number_of_jobs, na.rm = TRUE), by = 1))  
+        scale_y_continuous(breaks = seq(0, max(application_counts$number_of_jobs, na.rm = TRUE), by = 2)) +  
+        scale_size_continuous("Number of \nApplications", breaks = seq(1, max(application_counts$number_of_jobs, na.rm = TRUE), by = 2))  
 
       
     })
