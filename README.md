@@ -91,6 +91,9 @@ shiny::runApp()
 
 ## References 
 
+R Core Team (2023). _R: A Language and Environment for Statistical Computing_. R Foundation for Statistical Computing, Vienna, Austria.
+<https://www.R-project.org/>.
+
 Wickham H, Averick M, Bryan J, Chang W, McGowan LD, François R, Grolemund G, Hayes A, Henry L, Hester J, Kuhn M, Pedersen TL, Miller E, Bache SM, Müller K, Ooms J,
 Robinson D, Seidel DP, Spinu V, Takahashi K, Vaughan D, Wilke C, Woo K, Yutani H (2019). “Welcome to the tidyverse.” _Journal of Open Source Software_, *4*(43),
 1686. doi:10.21105/joss.01686 <https://doi.org/10.21105/joss.01686>.
@@ -108,5 +111,6 @@ Sievert C, Cheng J, Aden-Buie G (2023). _bslib: Custom 'Bootstrap' 'Sass' Themes
 Clarke E, Sherrill-Mix S, Dawson C (2023). _ggbeeswarm: Categorical Scatter (Violin Point) Plots_. R package version 0.7.2,
 <https://CRAN.R-project.org/package=ggbeeswarm>.
 
-R Core Team (2023). _R: A Language and Environment for Statistical Computing_. R Foundation for Statistical Computing, Vienna, Austria.
-<https://www.R-project.org/>.
+Perrier V, Meyer F, Granjon D (2024). _shinyWidgets: Custom Inputs Widgets for Shiny_. R package version 0.8.1, <https://CRAN.R-project.org/package=shinyWidgets>.
+
+Sjoberg D (2024). _ggsankey: Sankey, Alluvial and Sankey Bump Plots_. R package version 0.0.99999, <https://github.com/davidsjoberg/ggsankey>.
