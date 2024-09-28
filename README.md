@@ -63,15 +63,15 @@ The UI is rendered dynamically, allowing users to filter data by date and view t
 
 ## Visual Components
 
-**Value Boxes**: Quickly see key application stats at a glance.
-**Bar Plot**: Shows the number of applications for each job sector and the outcome.
-**Violin Plot with Beeswarm**: Displays salary distribution across job sectors with additional NA count annotation.
-**Smooth Line Plot**: Shows job application trends over time, broken down by week.
+- **Value Boxes**: Quickly see key application stats at a glance.
+- **Bar Plot**: Shows the number of applications for each job sector and the outcome.
+- **Violin Plot with Beeswarm**: Displays salary distribution across job sectors with additional NA count annotation.
+- **Smooth Line Plot**: Shows job application trends over time, broken down by week.
 
 ## Future Plans
 
-**Improved UI**: Enhance the user interface to allow more customization and filtering.
-**More Detailed Analytics**: Provide deeper insights into application outcomes and salary trends.
+- **Improved UI**: Enhance the user interface to allow more customization and filtering.
+- **More Detailed Analytics**: Provide deeper insights into application outcomes and salary trends.
 
 ## How to Run the App
 
