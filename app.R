@@ -18,13 +18,14 @@ p_load(tidyverse, googlesheets4, shiny, lubridate, bslib, ggbeeswarm, shinycsslo
 # gs4_deauth()
 
 # Authenticate using token. If no browser opens, the authentication works.
-gs4_auth(cache = ".secrets", email = "colewilliambaril95@gmail.com")
+gs4_auth(cache = ".secrets", email = "Your Email")
 
 # Setup ----
 
+# Disable use of scientific notation throughout app
 options(scipen=10000)
 
-df <- read_sheet("https://docs.google.com/spreadsheets/d/1mxJ46ZMN1EMKeJje2Ol0_XCcp6lf4PmEK5S8KZjR_mU/edit?gid=0#gid=0") |> 
+df <- read_sheet("Your Google Sheet URL") |> 
   drop_na(`Job Title`) |> 
   mutate(normalized_salary_low = case_when(`Pay Unit` == "Hourly" ~ `Pay Lower`*1890,
                                            `Pay Unit` == "Biweekly" ~ `Pay Lower`*27,
@@ -36,37 +37,11 @@ df <- read_sheet("https://docs.google.com/spreadsheets/d/1mxJ46ZMN1EMKeJje2Ol0_X
                                            NA ~ `Pay Upper`)) |> 
   mutate(average_salary = (normalized_salary_low + normalized_salary_high) / 2)
 
-
-
+# Compute minimum and maximum values for initial slider positions 
 min_salary <- min(df$normalized_salary_low, na.rm = TRUE)
-
 max_salary <- max(df$normalized_salary_high, na.rm = TRUE)
-
 min_date <- min(as_date(df$`Date Applied`))
-
 max_date <- max(as_date(df$`Date Applied`))
-
-# application_counts <- df %>%
-#   group_by(`Date Applied`, Sector, `Work Location`, `Job Type`) %>%
-#   summarise(number_of_jobs = n(), .groups = "drop")
-
-
-
-total_jobs <- nrow(df)
-
-total_cover_letters <- df |> 
-  filter(`Cover Letter` == TRUE) |> 
-  nrow()
-
-total_exams <- df |> 
-  filter(`Exam` == TRUE) |> 
-  nrow()
-
-total_interviews <- df |> 
-  filter(`Interview` == TRUE) |> 
-  nrow()
-
-time_spent <- sum(df$`Time Spent (Hours)`)
 
 
 
@@ -81,12 +56,12 @@ options(shiny.sanitize.errors = TRUE,
 
 ui <- page_sidebar(
   title = "Cole's Job Applications Dashboard",
-  
-
 
   sidebar = sidebar(
+    # Width of sidebar
     width = 300,
     
+    # Application Result selector
     selectInput(inputId = "application_result", 
                 label = "Select Plot Type for Application Result", 
                 choices = c("Sankey Plot", "Bar Plot"), 
@@ -94,6 +69,7 @@ ui <- page_sidebar(
                 multiple = FALSE,
                 width = "auto"),
     
+    # Date range slider
     sliderInput(
       inputId = "date_range",               
       label = "Select Date Range",          
@@ -103,15 +79,18 @@ ui <- page_sidebar(
       timeFormat = "%Y-%m-%d"              
     ),
     
-    sliderInput(
-      inputId = "salary",               
-      label = "Select Salary Range",          
-      min = min(min_salary), 
-      max = max(max_salary), 
-      value = c(min(min_salary), max(max_salary))
+    # Filter by salary?
+    checkboxInput(
+      inputId = "filter_salary",
+      label = "Check to filter by salary",
+      value = FALSE
     ),
-    helpText("Slide to adjust salary range. NAs will be included if no selection is made."),
+    p("Checking this box will remove jobs with no salary listed."),
     
+    # Salary slider if the above box is ticked
+    uiOutput("salary_filter"),
+    
+    # Filter by job type
     selectInput("job_type", 
                 label = "Select Job Type", 
                 choices = unique(df$`Job Type`), 
@@ -119,6 +98,7 @@ ui <- page_sidebar(
                 multiple = TRUE,
                 width = "auto"),
     
+    # Filter by work location
     selectInput("location", 
                 label = "Select Work Location", 
                 choices = unique(df$`Work Location`), 
@@ -126,13 +106,7 @@ ui <- page_sidebar(
                 multiple = TRUE,
                 width = "auto"),
     
-    # pickerInput("job_type", 
-    #             label = "Select Job Type", 
-    #             choices = unique(df$`Job Type`), 
-    #             selected = unique(df$`Job Type`),
-    #             multiple = TRUE,
-    #             width = "auto",
-    #             options = list(`actions-box` = TRUE)),
+
     # p(strong("Personal Links:"),
     #   br(),
     #   tags$a(href="https://github.com/colebaril/Jobs", "GitHub Repository"),
@@ -147,24 +121,40 @@ ui <- page_sidebar(
     # tags$strong(tags$a(href="mailto:colebarilca@gmail.com", "Email me!"))
     # ),  # Replace with your email address
   ),
+  
+  # Box UI - note there is a bug when toggling the salary filter causing a brief error
+  # to appear. This is because the reactive elements do not yet have the user selection
+  
   uiOutput("boxes"),
   
+# Plot cards: added a spinner to prevent errors while loading from occurring 
+# Application Result Card
   layout_columns(
     card(
       full_screen = TRUE,
       card_header("Application Result"),
-      plotOutput("app_result")
+      plotOutput("app_result") |> withSpinner() |> (\(x) {
+        x[[4]] <- x[[4]] |> bslib::as_fill_carrier() 
+        x})()
     ),
+    
+    # Compensation Card
     card(
       full_screen = TRUE,
       card_header("Compensation"),
-      plotOutput("compensation")
+      plotOutput("compensation") |> withSpinner() |> (\(x) {
+        x[[4]] <- x[[4]] |> bslib::as_fill_carrier() 
+        x})()
     )
   ),
+
+# OVer time card
   card(
     full_screen = TRUE,
     card_header("Number of Applications Over Time"),
-    plotOutput("date_applied")
+    plotOutput("date_applied") |> withSpinner() |> (\(x) {
+      x[[4]] <- x[[4]] |> bslib::as_fill_carrier() 
+      x})()
   )
 )
 
@@ -174,101 +164,117 @@ ui <- page_sidebar(
 
 server <- function(input, output) {
   
-  # Reactive calculation of total jobs
-  total_jobs <- reactive({
-    df |>
-      filter(`Job Type` %in% input$job_type) |>
-      filter(`Work Location` %in% input$location) |>
-      filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) |>
-      filter(
-        if (input$salary[1] == min_salary & input$salary[2] == max_salary) {
-          TRUE  # Keep all rows, including NAs, when slider is at default
-        } else {
-          normalized_salary_low >= input$salary[1] & 
-            normalized_salary_high <= input$salary[2] & 
-            !is.na(normalized_salary_low) & 
-            !is.na(normalized_salary_high)  # Exclude NAs if slider is moved
-        }
-      ) |>
-      nrow()
+  
+  # Salary filter UI if filter_salary is selected 
+  output$salary_filter <- renderUI({
+   
+    if(input$filter_salary == TRUE) {
+    sliderInput(
+      inputId = "salary_range",               
+      label = "Select Salary Range",          
+      min = min(df$normalized_salary_low, na.rm = TRUE), 
+      max = max(df$normalized_salary_high, na.rm = TRUE), 
+      value = c(min(df$normalized_salary_low, na.rm = TRUE), max(df$normalized_salary_high, na.rm = TRUE))
+      
+    
+    )
+    }
+    
   })
   
-  # Reactive calculation of total cover letters
+
+
+  ## Total jobs ----
+
+  total_jobs <- reactive({
+    df_filtered <- df |> 
+      filter(`Job Type` %in% input$job_type) |>
+      filter(`Work Location` %in% input$location) |>
+      filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2])
+    
+    # Conditionally apply the salary filter
+    if (input$filter_salary == TRUE) {
+      df_filtered <- df_filtered |>
+        filter(normalized_salary_low >= input$salary_range[1] &
+                 normalized_salary_high <= input$salary_range[2])
+    }
+    
+    # Return the number of rows after filtering
+    nrow(df_filtered)
+  })
+  
+  
+
+  ## Cover letters ----
+
   total_cover_letters <- reactive({
-    df |>
+    df_filtered <- df |>
       filter(`Cover Letter` == TRUE) |>
       filter(`Job Type` %in% input$job_type) |>
       filter(`Work Location` %in% input$location) |>
-      filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) |>
-      filter(
-        if (input$salary[1] == min_salary & input$salary[2] == max_salary) {
-          TRUE
-        } else {
-          normalized_salary_low >= input$salary[1] & 
-            normalized_salary_high <= input$salary[2] & 
-            !is.na(normalized_salary_low) & 
-            !is.na(normalized_salary_high)
-        }
-      ) |>
-      nrow()
+      filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2])
+    
+    # Conditionally apply the salary filter
+    if (input$filter_salary == TRUE) {
+      df_filtered <- df_filtered |>
+        filter(normalized_salary_low >= input$salary_range[1] &
+                 normalized_salary_high <= input$salary_range[2])
+    }
+    
+    nrow(df_filtered)
   })
   
-  # Reactive calculation of total exams
+## Exams ----
   total_exams <- reactive({
-    df |>
+    df_filtered <- df |>
       filter(`Exam` == TRUE) |>
       filter(`Job Type` %in% input$job_type) |>
       filter(`Work Location` %in% input$location) |>
-      filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) |>
-      filter(
-        if (input$salary[1] == min_salary & input$salary[2] == max_salary) {
-          TRUE
-        } else {
-          normalized_salary_low >= input$salary[1] & 
-            normalized_salary_high <= input$salary[2] & 
-            !is.na(normalized_salary_low) & 
-            !is.na(normalized_salary_high)
-        }
-      ) |>
-      nrow()
+      filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2])
+    
+    # Conditionally apply the salary filter
+    if (input$filter_salary == TRUE) {
+      df_filtered <- df_filtered |>
+        filter(normalized_salary_low >= input$salary_range[1] &
+                 normalized_salary_high <= input$salary_range[2])
+    }
+
+    nrow(df_filtered)
   })
   
-  # Reactive calculation of total interviews
+## Interviews ----
   total_interviews <- reactive({
-    df |>
+    df_filtered <- df |>
       filter(`Interview` == TRUE) |>
       filter(`Job Type` %in% input$job_type) |>
       filter(`Work Location` %in% input$location) |>
-      filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) |>
-      filter(
-        if (input$salary[1] == min_salary & input$salary[2] == max_salary) {
-          TRUE
-        } else {
-          normalized_salary_low >= input$salary[1] & 
-            normalized_salary_high <= input$salary[2] & 
-            !is.na(normalized_salary_low) & 
-            !is.na(normalized_salary_high)
-        }
-      ) |>
-      nrow()
+      filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2])
+    
+    # Conditionally apply the salary filter
+    if (input$filter_salary == TRUE) {
+      df_filtered <- df_filtered |>
+        filter(normalized_salary_low >= input$salary_range[1] &
+                 normalized_salary_high <= input$salary_range[2])
+    }
+
+    nrow(df_filtered)
   })
   
-  # Reactive calculation of time spent
+## Time Spent ----
   time_spent <- reactive({
-    df |>
+    df_filtered <- df |>
       filter(`Job Type` %in% input$job_type) |>
       filter(`Work Location` %in% input$location) |>
-      filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) |>
-      filter(
-        if (input$salary[1] == min_salary & input$salary[2] == max_salary) {
-          TRUE
-        } else {
-          normalized_salary_low >= input$salary[1] & 
-            normalized_salary_high <= input$salary[2] & 
-            !is.na(normalized_salary_low) & 
-            !is.na(normalized_salary_high)
-        }
-      ) |>
+      filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2])
+    
+    # Conditionally apply the salary filter
+    if (input$filter_salary == TRUE) {
+      df_filtered <- df_filtered |>
+        filter(normalized_salary_low >= input$salary_range[1] &
+                 normalized_salary_high <= input$salary_range[2]) 
+    }
+    
+    df_filtered |> 
       summarise(total_time = sum(`Time Spent (Hours)`, na.rm = TRUE)) |>
       pull(total_time)
   })
@@ -277,7 +283,9 @@ server <- function(input, output) {
   
   # Layout for value boxes
   output$boxes <- renderUI({
+    try(
     layout_columns(
+
       height = "120px",
       fill = FALSE,
       value_box(
@@ -291,8 +299,9 @@ server <- function(input, output) {
           ),
           tags$strong(total_jobs(), style = "font-size: 32px; margin-top: 8px;")  # Adjusted size for the number
         ),
-        style = 'background-color: #f5f5f5!important; padding: 8px; height: 120px;',  # Adjusted height, keeping width default
+        style = 'background-color: #f5f5f5!important; padding: 8px;',  # Adjusted height, keeping width default
         showcase = NULL  # No showcase needed since the icon is handled inside
+      
 
       ),
       value_box(
@@ -354,32 +363,35 @@ server <- function(input, output) {
         style = 'background-color: #c25b56!important; padding: 8px;',
         showcase = NULL
       )
+    ),
+    silent = TRUE
     )
   })
 
   
   # Plots ----
 
-  
+  # Application result plots; either sankey or bar based on user input
   output$app_result <- renderPlot({
     
     if(input$application_result == "Bar Plot"){
-    
-    df |>
+      
+      # Application result bar plot
+    df_filtered <- df |>
       filter(`Job Type` %in% input$job_type) |>
       filter(`Work Location` %in% input$location) |>
-      filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) |>
-      # Conditional salary filter
-      filter(
-        if (input$salary[1] == min_salary & input$salary[2] == max_salary) {
-          TRUE  # Keep all rows including NAs when slider is at default
-        } else {
-          normalized_salary_low >= input$salary[1] &
-            normalized_salary_high <= input$salary[2] &
-            !is.na(normalized_salary_low) &
-            !is.na(normalized_salary_high)  # Exclude NAs if slider is moved
+      filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) 
+        
+        # Conditionally apply the salary filter
+        if (input$filter_salary == TRUE) {
+
+          df_filtered <- df_filtered |>
+            filter(normalized_salary_low >= input$salary_range[1] &
+                     normalized_salary_high <= input$salary_range[2])
         }
-      ) |>
+    
+    df_filtered |> 
+     
     ggplot() +
       geom_bar(aes(x = `Sector`, fill = `Result`, colour = `Result`), alpha = 0.5) +
       theme_bw(base_size = 16) +
@@ -388,30 +400,32 @@ server <- function(input, output) {
       scale_y_continuous(breaks = scales::pretty_breaks(), labels = scales::label_number(accuracy = 1)) +
       theme(axis.text.x = element_text(size = 10)) +
       labs(x = "Job Sector",
-           y = "Number of Applications")
+           y = "Number of Applications")|> 
+      suppressWarnings()
       
     } else if(input$application_result == "Sankey Plot") {
-    
-    
-    df_sankey <- df |> 
-      filter(`Job Type` %in% input$job_type) |>
-      filter(`Work Location` %in% input$location) |>
-      filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) |> 
-      # Conditional salary filter
-      filter(
-        if (input$salary[1] == min_salary & input$salary[2] == max_salary) {
-          TRUE  # Keep all rows including NAs when slider is at default
-        } else {
-          normalized_salary_low >= input$salary[1] & 
-            normalized_salary_high <= input$salary[2] & 
-            !is.na(normalized_salary_low) & 
-            !is.na(normalized_salary_high)  # Exclude NAs if slider is moved
-        }
-      ) |>
+
+      # Application result sankey plot
+      df_filtered <- df |>
+        filter(`Job Type` %in% input$job_type) |>
+        filter(`Work Location` %in% input$location) |>
+        filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) 
+      
+
+      # Conditionally apply the salary filter
+      if (input$filter_salary == TRUE) {
+
+        
+        df_filtered <- df_filtered |>
+          filter(normalized_salary_low >= input$salary_range[1] &
+                   normalized_salary_high <= input$salary_range[2])
+      }
+      
+      df_sankey <- df_filtered |> 
       make_long(Sector, Exam, Interview, Result)
 
     
-    # png("sankey_plot.png", width = 800, height = 600)
+
     
     ggplot(df_sankey, aes(x = x, next_x = next_x, node = node, next_node = next_node, fill = factor(node), label = node)) +
       geom_sankey(flow.alpha = 0.5, node.color = "gray30") +  # Sankey plot
@@ -420,51 +434,37 @@ server <- function(input, output) {
       labs(x = "Competition Stage") +
       scale_fill_viridis_d(end = 0.9, option = "inferno") +
       theme(legend.position = "none", 
-            axis.title.y = element_text("none"))
+            axis.title.y = element_text("none")) |> 
+      suppressWarnings()
     
-    # dev.off()  # Close the file device after plotting
+
     
     }
     
     
   })
+  
+
     
     output$compensation <- renderPlot({
       
-      num_na_pre <-  df |> 
-        filter(`Job Type` %in% input$job_type) |>
-        filter(`Work Location` %in% input$location) |>
-        filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) |>
-        # Conditional salary filter
-        filter(
-          if (input$salary[1] == min_salary & input$salary[2] == max_salary) {
-            TRUE  # Keep all rows including NAs when slider is at default
-          } else {
-            normalized_salary_low >= input$salary[1] & 
-              normalized_salary_high <= input$salary[2] &  
-              !is.na(normalized_salary_low) & 
-              !is.na(normalized_salary_high)  # Exclude NAs if slider is moved
-          }
-        )
       
-      
-      num_na <- sum(is.na(num_na_pre$average_salary))
+      num_na <- sum(is.na(df$average_salary))
 
-      df |> 
+      df_filtered <- df |>
         filter(`Job Type` %in% input$job_type) |>
         filter(`Work Location` %in% input$location) |>
-        filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) |>
-        # Conditional salary filter
-        filter(
-          if (input$salary[1] == min_salary & input$salary[2] == max_salary) {
-            TRUE  # Keep all rows including NAs when slider is at default
-          } else {
-            normalized_salary_low >= input$salary[1] & 
-              normalized_salary_high <= input$salary[2] &  
-              !is.na(normalized_salary_low) & 
-              !is.na(normalized_salary_high)  # Exclude NAs if slider is moved
-          }
-        ) |>
+        filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) 
+      
+      # Conditionally apply the salary filter
+      if (input$filter_salary == TRUE) {
+        df_filtered <- df_filtered |>
+          filter(normalized_salary_low >= input$salary_range[1] &
+                   normalized_salary_high <= input$salary_range[2])
+        num_na <- sum(is.na(df_filtered$average_salary))
+      }
+      
+      df_filtered |> 
       ggplot(aes(x = Sector, y = average_salary, fill = `Sector`, colour = `Sector`)) +
         geom_violin(trim = FALSE, drop = FALSE, alpha = 0.6) +
         geom_beeswarm(size = 5, alpha = 0.8, pch=21) +
@@ -477,7 +477,8 @@ server <- function(input, output) {
         scale_y_continuous(labels = scales::comma) +
         
         labs(x = "Job Sector",
-             y = "Mean Salary (CAD)")
+             y = "Mean Salary (CAD)") |> 
+        suppressWarnings()
       
      
     
@@ -485,25 +486,19 @@ server <- function(input, output) {
     
     output$date_applied <- renderPlot({
       # Create a new column for week-year
-      application_counts <- df %>%
-        # Filter by Date Applied range
-        filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) |>
-        
-        # Conditional salary filter
-        filter(
-          if (input$salary[1] == min_salary & input$salary[2] == max_salary) {
-            TRUE  # Keep all rows including NAs when slider is at default
-          } else {
-            normalized_salary_low >= input$salary[1] & 
-              normalized_salary_high <= input$salary[2] & 
-              !is.na(normalized_salary_low) & 
-              !is.na(normalized_salary_high)  # Exclude NAs if slider is moved
-          }
-        ) |>
-        
-        # Filter by Job Type and Location
+      df_filtered <- df |>
         filter(`Job Type` %in% input$job_type) |>
         filter(`Work Location` %in% input$location) |>
+        filter(`Date Applied` >= input$date_range[1] & `Date Applied` <= input$date_range[2]) 
+      
+      # Conditionally apply the salary filter
+      if (input$filter_salary == TRUE) {
+        df_filtered <- df_filtered |>
+          filter(normalized_salary_low >= input$salary_range[1] &
+                   normalized_salary_high <= input$salary_range[2])
+      }
+      
+      application_counts <- df_filtered |> 
         
         # Add week_year and count the number of jobs
         mutate(week_year = paste0(format(`Date Applied`, "%Y"), "-W", 
@@ -526,7 +521,8 @@ server <- function(input, output) {
         theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10)) +  
         expand_limits(y = max(application_counts$number_of_jobs) + 0.5) +
         scale_y_continuous(breaks = seq(0, max(application_counts$number_of_jobs, na.rm = TRUE), by = 2)) +  
-        scale_size_continuous("Number of \nApplications", breaks = seq(1, max(application_counts$number_of_jobs, na.rm = TRUE), by = 2))  
+        scale_size_continuous("Number of \nApplications", breaks = seq(1, max(application_counts$number_of_jobs, na.rm = TRUE), by = 2)) |> 
+        suppressWarnings()
 
       
     })
