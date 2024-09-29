@@ -105,21 +105,6 @@ ui <- page_sidebar(
                 selected = unique(df$`Work Location`),
                 multiple = TRUE,
                 width = "auto"),
-    
-
-    # p(strong("Personal Links:"),
-    #   br(),
-    #   tags$a(href="https://github.com/colebaril/Jobs", "GitHub Repository"),
-    #   br(),
-    #   tags$a(href="https://github.com/colebaril", "GitHub Page"),
-    #   br(),
-    #   tags$a(href="https://colebaril.ca/", "Personal Website"),
-    #   br(),
-    #   tags$a(href="https://colebaril.ca/files/Cole%20Baril%20CV%20Sept%202024.pdf", "My Resume"),
-    # ),
-    # p(strong("Looking for a star employee?"),
-    # tags$strong(tags$a(href="mailto:colebarilca@gmail.com", "Email me!"))
-    # ),  # Replace with your email address
   ),
   
   # Box UI - note there is a bug when toggling the salary filter causing a brief error
